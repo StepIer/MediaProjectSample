@@ -5,8 +5,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Bitmap;
+import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.media.Image;
+import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
@@ -24,6 +28,16 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -149,8 +163,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
+    protected void onDestroy() {
+        super.onDestroy();
 
         if (isReceiverRegistered) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver);
@@ -187,6 +201,9 @@ public class MainActivity extends AppCompatActivity {
 
         mMediaProjection.registerCallback(callback, null);
 
+        ImageReader imageReader = ImageReader.newInstance(720, 1080, PixelFormat.RGBA_8888, 2);
+
+
         mVirtualDisplay = mMediaProjection.createVirtualDisplay(
                 "ScreenCapture",
                 720,
@@ -194,13 +211,52 @@ public class MainActivity extends AppCompatActivity {
                 getResources().getDisplayMetrics().densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY |
                         DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC,
-                mSurface,
+                imageReader.getSurface(),
                 null,
                 mHandler);
 
+
         mButtonToggle.setText("Stop");
 
+//        virtualDisplay = mMediaProjection.createVirtualDisplay("ScreenCapture",
+//                width, height, density,
+//                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+//                imageReader.getSurface(), null, null);
+
+        imageReader.setOnImageAvailableListener(reader -> {
+            Image image = reader.acquireLatestImage();
+            if (image != null) {
+                saveImage(image);
+                image.close();
+            }
+        }, new Handler(Looper.getMainLooper()));
+
         // Do whatever you need with the virtualDisplay
+    }
+
+    private void saveImage(Image image) {
+        Bitmap bitmap = imageToBitmap(image);
+
+        TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        InputImage inputImage = InputImage.fromBitmap(bitmap, 0);
+
+        ImageProcess.INSTANCE.process(recognizer, inputImage);
+
+        File file = new File(getExternalFilesDir(null), "screenshot.png");
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            Toast.makeText(this, "Screenshot saved!", Toast.LENGTH_SHORT).show();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Bitmap imageToBitmap(Image image) {
+        Image.Plane[] planes = image.getPlanes();
+        ByteBuffer buffer = planes[0].getBuffer();
+        Bitmap bitmap = Bitmap.createBitmap(720, 1080, Bitmap.Config.ARGB_8888);
+        bitmap.copyPixelsFromBuffer(buffer);
+        return bitmap;
     }
 
     private void stopScreenCapture() {

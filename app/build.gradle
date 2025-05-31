@@ -1,15 +1,15 @@
 plugins {
     alias(libs.plugins.androidApplication)
+    alias(libs.plugins.jetbrainsKotlinAndroid)
 }
 
 android {
     namespace 'com.jgeraldo.mediaprojectionsample'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.jgeraldo.mediaprojectionsample"
         minSdk 21
-        targetSdk 34
         versionCode 1
         versionName "1.0"
 
@@ -23,8 +23,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
     }
 }
 
@@ -34,6 +37,10 @@ dependencies {
     implementation libs.activity
     implementation libs.constraintlayout
     implementation libs.localbroadcastmanager
+
+    // To recognize Latin script
+    implementation libs.text.recognition
+    implementation libs.core.ktx
 
     testImplementation libs.junit
     androidTestImplementation libs.ext.junit
